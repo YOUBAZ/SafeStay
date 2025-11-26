@@ -1,0 +1,31 @@
+{
+  "name": "safestay-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "SafeStay - Student Housing Platform",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run dev:web\" \"npm run dev:api\"",
+    "dev:web": "npm run dev --workspace=@safestay/web",
+    "dev:owner": "npm run dev --workspace=@safestay/owner-portal",
+    "dev:admin": "npm run dev --workspace=@safestay/admin-panel",
+    "dev:api": "npm run dev --workspace=@safestay/api",
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down",
+    "db:migrate": "npm run migrate --workspace=@safestay/database",
+    "db:seed": "npm run seed --workspace=@safestay/database"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}

@@ -1,0 +1,25 @@
+{
+    "name": "@safestay/database",
+    "version": "1.0.0",
+    "description": "SafeStay Database Schemas and Migrations",
+    "main": "index.ts",
+    "scripts": {
+        "migrate": "prisma migrate dev",
+        "migrate:deploy": "prisma migrate deploy",
+        "migrate:reset": "prisma migrate reset",
+        "generate": "prisma generate",
+        "studio": "prisma studio",
+        "seed": "tsx prisma/seed.ts",
+        "format": "prisma format"
+    },
+    "dependencies": {
+        "@prisma/client": "^5.7.0",
+        "mongoose": "^8.0.3"
+    },
+    "devDependencies": {
+        "prisma": "^5.7.0",
+        "tsx": "^4.7.0",
+        "typescript": "^5.3.3",
+        "@types/node": "^20.10.5"
+    }
+}

@@ -1,0 +1,596 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  student
+  owner
+  admin
+  parent
+}
+
+enum GenderType {
+  male
+  female
+  prefer_not_to_say
+}
+
+enum RelationType {
+  father
+  mother
+  guardian
+  other
+}
+
+enum OwnerType {
+  individual
+  company
+  property_management
+}
+
+enum PropertyType {
+  apartment
+  room
+  shared_room
+  studio
+  villa
+}
+
+enum GenderRestriction {
+  male_only
+  female_only
+  mixed
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+  suspended
+}
+
+enum BookingStatus {
+  pending
+  approved
+  rejected
+  payment_pending
+  active
+  completed
+  cancelled
+  terminated
+}
+
+enum PaymentType {
+  deposit
+  rent
+  commission
+  service_fee
+  refund
+}
+
+enum PaymentStatus {
+  pending
+  processing
+  completed
+  failed
+  refunded
+  cancelled
+}
+
+enum PaymentMethod {
+  card
+  bank_transfer
+  cash
+  installment
+}
+
+enum PaymentGateway {
+  paymob
+  stripe
+  fawry
+  manual
+}
+
+enum EscrowStatus {
+  not_applicable
+  held
+  released_to_owner
+  refunded_to_student
+}
+
+enum DisputeType {
+  payment
+  property_condition
+  contract_breach
+  harassment
+  safety_concern
+  deposit_refund
+  early_termination
+  other
+}
+
+enum DisputeStatus {
+  open
+  investigating
+  waiting_response
+  resolved
+  closed
+  escalated
+}
+
+enum NotificationType {
+  booking_request
+  booking_approved
+  booking_rejected
+  payment_due
+  payment_received
+  message_received
+  review_received
+  verification_approved
+  verification_rejected
+  dispute_created
+  dispute_resolved
+  contract_signed
+  system_announcement
+}
+
+enum VerificationType {
+  student_id
+  national_id
+  property_photos
+  property_visit
+  bank_account
+  business_license
+}
+
+// ============================================================================
+// User Models
+// ============================================================================
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  phone             String    @unique
+  passwordHash      String    @map("password_hash")
+  role              UserRole
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  avatarUrl         String?   @map("avatar_url")
+  isEmailVerified   Boolean   @default(false) @map("is_email_verified")
+  isPhoneVerified   Boolean   @default(false) @map("is_phone_verified")
+  isActive          Boolean   @default(true) @map("is_active")
+  lastLoginAt       DateTime? @map("last_login_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+
+  studentProfile         StudentProfile?
+  parentProfile          ParentProfile?
+  ownerProfile           OwnerProfile?
+  notifications          Notification[]
+  disputesRaised         Dispute[]              @relation("DisputesRaised")
+  disputesAgainst        Dispute[]              @relation("DisputesAgainst")
+  disputesResolved       Dispute[]              @relation("DisputesResolved")
+  paymentsMade           Payment[]              @relation("PaymentsMade")
+  paymentsReceived       Payment[]              @relation("PaymentsReceived")
+  verificationRequests   VerificationRequest[]
+  propertiesVerified     Property[]             @relation("PropertiesVerified")
+
+  @@index([email])
+  @@index([phone])
+  @@index([role])
+  @@map("users")
+}
+
+model StudentProfile {
+  id                  String      @id @default(uuid())
+  userId              String      @unique @map("user_id")
+  university          String?
+  studentId           String?     @map("student_id")
+  studentIdVerified   Boolean     @default(false) @map("student_id_verified")
+  gender              GenderType?
+  dateOfBirth         DateTime?   @map("date_of_birth") @db.Date
+  governorate         String?
+  nationality         String?     @default("Egyptian")
+  preferences         Json        @default("{}")
+  parentId            String?     @map("parent_id")
+  createdAt           DateTime    @default(now()) @map("created_at")
+  updatedAt           DateTime    @updatedAt @map("updated_at")
+
+  user     User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent   ParentProfile?  @relation(fields: [parentId], references: [id])
+  bookings Booking[]
+  reviews  Review[]
+
+  @@index([userId])
+  @@index([university])
+  @@map("student_profiles")
+}
+
+model ParentProfile {
+  id                String        @id @default(uuid())
+  userId            String        @unique @map("user_id")
+  relationToStudent RelationType? @map("relation_to_student")
+  nationalId        String?       @map("national_id")
+  linkedStudents    String[]      @default([]) @map("linked_students")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+
+  user     User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  students StudentProfile[]
+
+  @@index([userId])
+  @@map("parent_profiles")
+}
+
+model OwnerProfile {
+  id                       String      @id @default(uuid())
+  userId                   String      @unique @map("user_id")
+  ownerType                OwnerType   @map("owner_type")
+  nationalId               String?     @map("national_id")
+  nationalIdVerified       Boolean     @default(false) @map("national_id_verified")
+  businessLicense          String?     @map("business_license")
+  businessLicenseVerified  Boolean     @default(false) @map("business_license_verified")
+  taxId                    String?     @map("tax_id")
+  bankAccountNumber        String?     @map("bank_account_number")
+  bankName                 String?     @map("bank_name")
+  bankBranch               String?     @map("bank_branch")
+  propertiesCount          Int         @default(0) @map("properties_count")
+  averageRating            Decimal     @default(0) @db.Decimal(3, 2) @map("average_rating")
+  createdAt                DateTime    @default(now()) @map("created_at")
+  updatedAt                DateTime    @updatedAt @map("updated_at")
+
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  properties Property[]
+  bookings   Booking[]
+
+  @@index([userId])
+  @@map("owner_profiles")
+}
+
+// ============================================================================
+// Property Models
+// ============================================================================
+
+model Property {
+  id                   String              @id @default(uuid())
+  ownerId              String              @map("owner_id")
+  title                String
+  description          String?
+  propertyType         PropertyType        @map("property_type")
+  address              String
+  governorate          String
+  city                 String
+  district             String?
+  postalCode           String?             @map("postal_code")
+  latitude             Decimal?            @db.Decimal(10, 8)
+  longitude            Decimal?            @db.Decimal(11, 8)
+  pricePerMonth        Decimal             @map("price_per_month") @db.Decimal(10, 2)
+  depositAmount        Decimal             @map("deposit_amount") @db.Decimal(10, 2)
+  serviceFee           Decimal             @default(0) @map("service_fee") @db.Decimal(10, 2)
+  availableFrom        DateTime?           @map("available_from") @db.Date
+  isAvailable          Boolean             @default(true) @map("is_available")
+  genderRestriction    GenderRestriction?  @map("gender_restriction")
+  maxOccupants         Int                 @default(1) @map("max_occupants")
+  currentOccupants     Int                 @default(0) @map("current_occupants")
+  bedrooms             Int                 @default(0)
+  bathrooms            Int                 @default(0)
+  areaSqm              Decimal?            @map("area_sqm") @db.Decimal(8, 2)
+  floorNumber          Int?                @map("floor_number")
+  totalFloors          Int?                @map("total_floors")
+  amenities            Json                @default("[]")
+  utilitiesIncluded    Json                @default("[]") @map("utilities_included")
+  houseRules           String?             @map("house_rules")
+  verificationStatus   VerificationStatus  @default(pending) @map("verification_status")
+  verificationNotes    String?             @map("verification_notes")
+  verifiedAt           DateTime?           @map("verified_at")
+  verifiedBy           String?             @map("verified_by")
+  viewCount            Int                 @default(0) @map("view_count")
+  favoriteCount        Int                 @default(0) @map("favorite_count")
+  bookingCount         Int                 @default(0) @map("booking_count")
+  averageRating        Decimal             @default(0) @db.Decimal(3, 2) @map("average_rating")
+  reviewCount          Int                 @default(0) @map("review_count")
+  isFeatured           Boolean             @default(false) @map("is_featured")
+  featuredUntil        DateTime?           @map("featured_until")
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+
+  owner             OwnerProfile        @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  verifier          User?               @relation("PropertiesVerified", fields: [verifiedBy], references: [id])
+  images            PropertyImage[]
+  distances         PropertyDistance[]
+  bookings          Booking[]
+  reviews           Review[]
+  favorites         Favorite[]
+
+  @@index([ownerId])
+  @@index([governorate, city])
+  @@index([pricePerMonth])
+  @@index([isAvailable])
+  @@index([verificationStatus])
+  @@index([latitude, longitude])
+  @@map("properties")
+}
+
+model PropertyImage {
+  id           String   @id @default(uuid())
+  propertyId   String   @map("property_id")
+  imageUrl     String   @map("image_url")
+  thumbnailUrl String?  @map("thumbnail_url")
+  isPrimary    Boolean  @default(false) @map("is_primary")
+  displayOrder Int      @default(0) @map("display_order")
+  caption      String?
+  uploadedAt   DateTime @default(now()) @map("uploaded_at")
+
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@index([propertyId])
+  @@index([propertyId, displayOrder])
+  @@map("property_images")
+}
+
+model University {
+  id          String   @id @default(uuid())
+  name        String
+  nameAr      String?  @map("name_ar")
+  governorate String
+  city        String
+  address     String?
+  latitude    Decimal  @db.Decimal(10, 8)
+  longitude   Decimal  @db.Decimal(11, 8)
+  website     String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  propertyDistances PropertyDistance[]
+
+  @@index([governorate, city])
+  @@map("universities")
+}
+
+model PropertyDistance {
+  id                  String   @id @default(uuid())
+  propertyId          String   @map("property_id")
+  universityId        String   @map("university_id")
+  distanceKm          Decimal  @map("distance_km") @db.Decimal(6, 2)
+  commuteTimeMinutes  Int?     @map("commute_time_minutes")
+
+  property   Property   @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  university University @relation(fields: [universityId], references: [id], onDelete: Cascade)
+
+  @@unique([propertyId, universityId])
+  @@index([propertyId])
+  @@index([universityId])
+  @@index([distanceKm])
+  @@map("property_distances")
+}
+
+// ============================================================================
+// Booking & Payment Models
+// ============================================================================
+
+model Booking {
+  id                     String         @id @default(uuid())
+  propertyId             String         @map("property_id")
+  studentId              String         @map("student_id")
+  ownerId                String         @map("owner_id")
+  status                 BookingStatus  @default(pending)
+  startDate              DateTime       @map("start_date") @db.Date
+  endDate                DateTime       @map("end_date") @db.Date
+  moveInDate             DateTime?      @map("move_in_date") @db.Date
+  moveOutDate            DateTime?      @map("move_out_date") @db.Date
+  monthlyRent            Decimal        @map("monthly_rent") @db.Decimal(10, 2)
+  depositAmount          Decimal        @map("deposit_amount") @db.Decimal(10, 2)
+  commissionAmount       Decimal?       @map("commission_amount") @db.Decimal(10, 2)
+  totalAmount            Decimal        @map("total_amount") @db.Decimal(10, 2)
+  contractUrl            String?        @map("contract_url")
+  contractTemplateId     String?        @map("contract_template_id")
+  contractGeneratedAt    DateTime?      @map("contract_generated_at")
+  signedByStudentAt      DateTime?      @map("signed_by_student_at")
+  signedByOwnerAt        DateTime?      @map("signed_by_owner_at")
+  signedByParentAt       DateTime?      @map("signed_by_parent_at")
+  parentSignatureRequired Boolean       @default(false) @map("parent_signature_required")
+  approvedAt             DateTime?      @map("approved_at")
+  rejectedAt             DateTime?      @map("rejected_at")
+  rejectionReason        String?        @map("rejection_reason")
+  cancelledAt            DateTime?      @map("cancelled_at")
+  cancellationReason     String?        @map("cancellation_reason")
+  notes                  String?
+  createdAt              DateTime       @default(now()) @map("created_at")
+  updatedAt              DateTime       @updatedAt @map("updated_at")
+
+  property Property        @relation(fields: [propertyId], references: [id])
+  student  StudentProfile  @relation(fields: [studentId], references: [id])
+  owner    OwnerProfile    @relation(fields: [ownerId], references: [id])
+  payments Payment[]
+  disputes Dispute[]
+  review   Review?
+
+  @@index([propertyId])
+  @@index([studentId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([startDate, endDate])
+  @@map("bookings")
+}
+
+model Payment {
+  id                String         @id @default(uuid())
+  bookingId         String         @map("booking_id")
+  payerId           String         @map("payer_id")
+  recipientId       String?        @map("recipient_id")
+  paymentType       PaymentType    @map("payment_type")
+  amount            Decimal        @db.Decimal(10, 2)
+  currency          String         @default("EGP")
+  status            PaymentStatus  @default(pending)
+  paymentMethod     PaymentMethod? @map("payment_method")
+  paymentGateway    PaymentGateway? @map("payment_gateway")
+  transactionId     String?        @unique @map("transaction_id")
+  gatewayReference  String?        @map("gateway_reference")
+  gatewayResponse   Json?          @map("gateway_response")
+  escrowStatus      EscrowStatus   @default(not_applicable) @map("escrow_status")
+  escrowReleasedAt  DateTime?      @map("escrow_released_at")
+  dueDate           DateTime?      @map("due_date") @db.Date
+  paidAt            DateTime?      @map("paid_at")
+  refundReason      String?        @map("refund_reason")
+  refundedAt        DateTime?      @map("refunded_at")
+  notes             String?
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  payer     User    @relation("PaymentsMade", fields: [payerId], references: [id])
+  recipient User?   @relation("PaymentsReceived", fields: [recipientId], references: [id])
+
+  @@index([bookingId])
+  @@index([payerId])
+  @@index([status])
+  @@index([transactionId])
+  @@map("payments")
+}
+
+// ============================================================================
+// Review & Rating Models
+// ============================================================================
+
+model Review {
+  id                   String   @id @default(uuid())
+  propertyId           String   @map("property_id")
+  studentId            String   @map("student_id")
+  bookingId            String   @unique @map("booking_id")
+  rating               Int
+  cleanlinessRating    Int?     @map("cleanliness_rating")
+  locationRating       Int?     @map("location_rating")
+  valueRating          Int?     @map("value_rating")
+  communicationRating  Int?     @map("communication_rating")
+  accuracyRating       Int?     @map("accuracy_rating")
+  title                String?
+  comment              String?
+  pros                 String?
+  cons                 String?
+  isVerified           Boolean  @default(false) @map("is_verified")
+  verifiedStay         Boolean  @default(true) @map("verified_stay")
+  ownerResponse        String?  @map("owner_response")
+  ownerRespondedAt     DateTime? @map("owner_responded_at")
+  isPublished          Boolean  @default(true) @map("is_published")
+  flagged              Boolean  @default(false)
+  flagReason           String?  @map("flag_reason")
+  helpfulCount         Int      @default(0) @map("helpful_count")
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  property Property        @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  student  StudentProfile  @relation(fields: [studentId], references: [id])
+  booking  Booking         @relation(fields: [bookingId], references: [id])
+
+  @@index([propertyId])
+  @@index([studentId])
+  @@index([rating])
+  @@map("reviews")
+}
+
+// ============================================================================
+// Dispute & Support Models
+// ============================================================================
+
+model Dispute {
+  id                 String         @id @default(uuid())
+  bookingId          String         @map("booking_id")
+  raisedBy           String         @map("raised_by")
+  againstUser        String?        @map("against_user")
+  disputeType        DisputeType    @map("dispute_type")
+  subject            String
+  description        String
+  status             DisputeStatus  @default(open)
+  priority           Int            @default(1)
+  evidenceUrls       Json           @default("[]") @map("evidence_urls")
+  resolvedBy         String?        @map("resolved_by")
+  resolutionNotes    String?        @map("resolution_notes")
+  resolutionType     String?        @map("resolution_type")
+  compensationAmount Decimal?       @map("compensation_amount") @db.Decimal(10, 2)
+  createdAt          DateTime       @default(now()) @map("created_at")
+  resolvedAt         DateTime?      @map("resolved_at")
+  closedAt           DateTime?      @map("closed_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  booking       Booking @relation(fields: [bookingId], references: [id])
+  raiser        User    @relation("DisputesRaised", fields: [raisedBy], references: [id])
+  againstUserRef User? @relation("DisputesAgainst", fields: [againstUser], references: [id])
+  resolver      User?   @relation("DisputesResolved", fields: [resolvedBy], references: [id])
+
+  @@index([bookingId])
+  @@index([raisedBy])
+  @@index([status])
+  @@map("disputes")
+}
+
+// ============================================================================
+// Notification & Verification Models
+// ============================================================================
+
+model Notification {
+  id          String            @id @default(uuid())
+  userId      String            @map("user_id")
+  type        NotificationType
+  title       String
+  message     String
+  data        Json              @default("{}")
+  isRead      Boolean           @default(false) @map("is_read")
+  readAt      DateTime?         @map("read_at")
+  sentViaEmail Boolean          @default(false) @map("sent_via_email")
+  sentViaSms  Boolean           @default(false) @map("sent_via_sms")
+  sentViaPush Boolean           @default(false) @map("sent_via_push")
+  createdAt   DateTime          @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([userId, isRead])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model VerificationRequest {
+  id               String              @id @default(uuid())
+  userId           String              @map("user_id")
+  entityId         String?             @map("entity_id")
+  entityType       String?             @map("entity_type")
+  verificationType VerificationType    @map("verification_type")
+  documentUrls     Json                @default("[]") @map("document_urls")
+  additionalInfo   Json                @default("{}") @map("additional_info")
+  status           VerificationStatus  @default(pending)
+  reviewedBy       String?             @map("reviewed_by")
+  rejectionReason  String?             @map("rejection_reason")
+  adminNotes       String?             @map("admin_notes")
+  submittedAt      DateTime            @default(now()) @map("submitted_at")
+  reviewedAt       DateTime?           @map("reviewed_at")
+  updatedAt        DateTime            @updatedAt @map("updated_at")
+
+  user     User  @relation(fields: [userId], references: [id])
+  reviewer User? @relation(fields: [reviewedBy], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@map("verification_requests")
+}
+
+model Favorite {
+  id         String   @id @default(uuid())
+  userId     String   @map("user_id")
+  propertyId String   @map("property_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  property Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, propertyId])
+  @@index([userId])
+  @@index([propertyId])
+  @@map("favorites")
+}
