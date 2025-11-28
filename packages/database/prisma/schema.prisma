@@ -180,8 +180,10 @@ model User {
   disputesResolved       Dispute[]              @relation("DisputesResolved")
   paymentsMade           Payment[]              @relation("PaymentsMade")
   paymentsReceived       Payment[]              @relation("PaymentsReceived")
-  verificationRequests   VerificationRequest[]
+  verificationRequests   VerificationRequest[]  @relation("VerificationRequests")
+  verificationReviews    VerificationRequest[]  @relation("VerificationReviews")
   propertiesVerified     Property[]             @relation("PropertiesVerified")
+  favorites              Favorite[]
 
   @@index([email])
   @@index([phone])
@@ -572,8 +574,8 @@ model VerificationRequest {
   reviewedAt       DateTime?           @map("reviewed_at")
   updatedAt        DateTime            @updatedAt @map("updated_at")
 
-  user     User  @relation(fields: [userId], references: [id])
-  reviewer User? @relation(fields: [reviewedBy], references: [id])
+  user     User  @relation("VerificationRequests", fields: [userId], references: [id])
+  reviewer User? @relation("VerificationReviews", fields: [reviewedBy], references: [id])
 
   @@index([userId])
   @@index([status])
